@@ -9,6 +9,3 @@ llama-cpp-python==0.3.1
 
 # Server (for production)
 gunicorn==23.0.0
-
-# Utilities
-leap-bundle

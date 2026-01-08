@@ -1,17 +1,34 @@
 # load_model.py - Script to download the LFM2 model during build
 import os
-import subprocess
 import sys
+import urllib.request
 
 # ============================================
 # CONFIGURATION
 # ============================================
 MODEL_PATH = "./model"
-MODEL_NAME = "LFM2-1.2B-RAG"
-QUANTIZATION = "Q4_0"
+MODEL_FILE = "LFM2-1.2B-Q4_0.gguf"
+# Direct download URL from Hugging Face
+MODEL_URL = "https://huggingface.co/LiquidAI/LFM2-1.2B-GGUF/resolve/main/LFM2-1.2B-Q4_0.gguf"
+
+def download_with_progress(url, destination):
+    """Download file with progress bar"""
+    def progress_hook(count, block_size, total_size):
+        percent = min(int(count * block_size * 100 / total_size), 100)
+        bar_length = 50
+        filled = int(bar_length * percent / 100)
+        bar = '█' * filled + '░' * (bar_length - filled)
+        mb_downloaded = (count * block_size) / (1024 * 1024)
+        mb_total = total_size / (1024 * 1024)
+        sys.stdout.write(f'\r   [{bar}] {percent}% ({mb_downloaded:.1f}/{mb_total:.1f} MB)')
+        sys.stdout.flush()
+    
+    print(f"   Downloading from: {url}")
+    urllib.request.urlretrieve(url, destination, progress_hook)
+    print()  # New line after progress bar
 
 def main():
-    """Download and prepare the LFM2 model"""
+    """Download the LFM2 model"""
     
     print("=" * 60)
     print("🚀 LFM2 Model Download Script")
@@ -22,64 +39,48 @@ def main():
         print(f"📁 Creating model directory: {MODEL_PATH}")
         os.makedirs(MODEL_PATH, exist_ok=True)
     
-    print(f"📦 Model: {MODEL_NAME}")
-    print(f"⚙️  Quantization: {QUANTIZATION}")
-    print(f"💾 Save path: {MODEL_PATH}")
+    model_file_path = os.path.join(MODEL_PATH, MODEL_FILE)
+    
+    print(f"📦 Model: {MODEL_FILE}")
+    print(f"💾 Save path: {model_file_path}")
     print()
     
+    # Check if model already exists
+    if os.path.exists(model_file_path):
+        size_mb = os.path.getsize(model_file_path) / (1024 * 1024)
+        print(f"✅ Model already exists ({size_mb:.2f} MB)")
+        print(f"   Skipping download")
+        print()
+        print("=" * 60)
+        print("✅ Model setup complete!")
+        print("=" * 60)
+        return
+    
     try:
-        # Install leap-bundle if not already installed
-        print("🔧 Installing leap-bundle...")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "leap-bundle"],
-            check=True,
-            capture_output=True
-        )
-        print("✅ leap-bundle installed")
+        print(f"⬇️  Downloading {MODEL_FILE}...")
+        print("   This will take 3-5 minutes...")
         print()
         
-        # Download the model using leap-bundle
-        print(f"⬇️  Downloading {MODEL_NAME} with {QUANTIZATION} quantization...")
-        print("   This may take a few minutes...")
+        # Download the model
+        download_with_progress(MODEL_URL, model_file_path)
         
-        # Run leap-bundle download command
-        result = subprocess.run(
-            [
-                "leap-bundle",
-                "download",
-                MODEL_NAME,
-                f"--quantization={QUANTIZATION}",
-                f"--output-dir={MODEL_PATH}"
-            ],
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        
+        print()
         print("✅ Model downloaded successfully!")
-        print()
         
-        # List downloaded files
-        print("📋 Downloaded files:")
-        for file in os.listdir(MODEL_PATH):
-            file_path = os.path.join(MODEL_PATH, file)
-            if os.path.isfile(file_path):
-                size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                print(f"   - {file} ({size_mb:.2f} MB)")
+        # Verify file size
+        size_mb = os.path.getsize(model_file_path) / (1024 * 1024)
+        print(f"   File size: {size_mb:.2f} MB")
         
         print()
         print("=" * 60)
         print("✅ Model setup complete!")
         print("=" * 60)
         
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error during model download: {e}")
-        print(f"   stdout: {e.stdout}")
-        print(f"   stderr: {e.stderr}")
-        sys.exit(1)
-        
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"❌ Error during model download: {e}")
+        # Clean up partial download
+        if os.path.exists(model_file_path):
+            os.remove(model_file_path)
         sys.exit(1)
 
 if __name__ == "__main__":
